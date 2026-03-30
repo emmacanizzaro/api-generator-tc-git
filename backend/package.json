@@ -1,0 +1,22 @@
+{
+  "name": "virtual-card-generator",
+  "version": "1.0.0",
+  "description": "Aplicación para generar y gestionar tarjetas virtuales usando APIs de proveedores financieros en sandbox",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check": "node --check server.js && node --check routes/cards.js && node --check services/provider.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "stripe": "^14.0.0",
+    "better-sqlite3": "^9.0.0",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2"
+  },
+  "devDependencies": {},
+  "author": "",
+  "license": "MIT"
+}

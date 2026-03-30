@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generador de Tarjetas Virtuales</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER -->
+    <header class="header">
+      <h1>💳 Generador de Tarjetas Virtuales</h1>
+      <p class="subtitle">Emisión de tarjetas en modo Sandbox</p>
+    </header>
+
+    <!-- ADVERTENCIA CUMPLIMIENTO -->
+    <section class="compliance-notice">
+      <h3>⚠️  Nota Importante</h3>
+      <p>
+        Esta aplicación utiliza <strong>APIs oficiales de emisión de tarjetas</strong> 
+        en modo <strong>Sandbox</strong> (pruebas). Requiere verificación previa del usuario 
+        en el proveedor de pagos. NO se pueden usar datos reales sin cumplimiento KYC/AML.
+      </p>
+      <p class="pci-note">
+        <strong>Cumplimiento PCI DSS:</strong> Esta app NO almacena números completos de tarjeta 
+        ni CVV. Solo se guardan últimos 4 dígitos para referencia.
+      </p>
+    </section>
+
+    <!-- FORMULARIO CREAR TARJETA -->
+    <section class="form-section">
+      <h2>Crear Nueva Tarjeta Virtual</h2>
+      <div class="form-group">
+        <form id="createCardForm">
+          <div class="input-wrapper">
+            <label for="holderName">Nombre del Titular:</label>
+            <input 
+              type="text" 
+              id="holderName" 
+              placeholder="Ej: Juan Pérez"
+              required
+              minlength="3"
+            >
+            <small>Mínimo 3 caracteres, solo letras</small>
+          </div>
+
+          <div class="button-group">
+            <button type="submit" class="btn btn-primary">
+              ➕ Crear Tarjeta
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="refreshCards()">
+              ↻ Actualizar Lista
+            </button>
+          </div>
+        </form>
+      </div>
+      <div id="formMessage" class="message"></div>
+    </section>
+
+    <!-- LISTA DE TARJETAS -->
+    <section class="cards-section">
+      <h2>Tarjetas Emitidas (<span id="cardCount">0</span>)</h2>
+      
+      <div id="noCards" class="empty-state">
+        <p>📭 No hay tarjetas creadas aún. Crea una para comenzar.</p>
+      </div>
+
+      <div id="cardsList" class="cards-grid"></div>
+    </section>
+
+    <!-- HISTORIAL/LOGS -->
+    <section class="logs-section">
+      <h2>📋 Logs de Consola</h2>
+      <div id="logContainer" class="log-container">
+        <p class="log-entry log-info">Sistema iniciado. Esperando acciones...</p>
+      </div>
+      <button class="btn btn-secondary" onclick="clearLogs()">Limpiar Logs</button>
+    </section>
+
+  </div>
+
+  <!-- MODAL para detalles de tarjeta -->
+  <div id="cardModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeCardModal()">&times;</span>
+      <h2>Detalles de Tarjeta</h2>
+      <div id="modalBody"></div>
+      <div class="modal-actions">
+        <button class="btn btn-warning" onclick="freezeCardFromModal()">❄️  Congelar</button>
+        <button class="btn btn-danger" onclick="cancelCardFromModal()">🗑️  Cancelar</button>
+        <button class="btn btn-secondary" onclick="closeCardModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
