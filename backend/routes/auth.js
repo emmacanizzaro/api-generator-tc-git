@@ -3,8 +3,10 @@ const router = express.Router();
 const { authenticateUser, issueToken } = require("../middleware/auth");
 
 router.post("/login", (req, res) => {
-  const username = typeof req.body.username === "string" ? req.body.username.trim() : "";
-  const password = typeof req.body.password === "string" ? req.body.password : "";
+  const username =
+    typeof req.body.username === "string" ? req.body.username.trim() : "";
+  const password =
+    typeof req.body.password === "string" ? req.body.password : "";
 
   if (!username || !password) {
     return res.status(400).json({

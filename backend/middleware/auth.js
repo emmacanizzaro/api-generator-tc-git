@@ -37,9 +37,7 @@ function issueToken(user) {
 
 function authenticateUser(username, password) {
   const users = getUsers();
-  return users.find(
-    (u) => u.username === username && u.password === password,
-  );
+  return users.find((u) => u.username === username && u.password === password);
 }
 
 function requireAuth(req, res, next) {

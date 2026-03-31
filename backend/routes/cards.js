@@ -48,8 +48,7 @@ router.post(
       return res.status(statusCode).json({
         success: false,
         error: error.message,
-        hint:
-          "Verifica que Stripe está configurado correctamente y tienes un cardholder registrado",
+        hint: "Verifica que Stripe está configurado correctamente y tienes un cardholder registrado",
       });
     }
   },
@@ -110,87 +109,102 @@ router.get("/:id", requireAuth, (req, res) => {
   }
 });
 
-router.post("/:id/reveal", requireAuth, requireRole("admin"), async (req, res) => {
-  try {
-    const { id } = req.params;
+router.post(
+  "/:id/reveal",
+  requireAuth,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    if (process.env.NODE_ENV === "production") {
-      return res.status(403).json({
-        success: false,
-        error: "Revelado de datos sensibles deshabilitado en producción",
+      if (process.env.NODE_ENV === "production") {
+        return res.status(403).json({
+          success: false,
+          error: "Revelado de datos sensibles deshabilitado en producción",
+        });
+      }
+
+      const sensitiveData = await provider.revealCardSensitiveData(id);
+
+      return res.json({
+        success: true,
+        data: sensitiveData,
+        warning: "Datos sensibles: no almacenar ni compartir.",
       });
-    }
+    } catch (error) {
+      if (error.message.includes("no encontrada")) {
+        return res.status(404).json({
+          success: false,
+          error: error.message,
+        });
+      }
 
-    const sensitiveData = await provider.revealCardSensitiveData(id);
-
-    return res.json({
-      success: true,
-      data: sensitiveData,
-      warning: "Datos sensibles: no almacenar ni compartir.",
-    });
-  } catch (error) {
-    if (error.message.includes("no encontrada")) {
-      return res.status(404).json({
-        success: false,
-        error: error.message,
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-router.post("/:id/freeze", requireAuth, requireRole("admin"), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await provider.freezeCard(id);
-
-    return res.json({
-      success: true,
-      message: result.message,
-      cardId: id,
-    });
-  } catch (error) {
-    if (error.message.includes("no encontrada")) {
-      return res.status(404).json({
+      return res.status(500).json({
         success: false,
         error: error.message,
       });
     }
+  },
+);
 
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+router.post(
+  "/:id/freeze",
+  requireAuth,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await provider.freezeCard(id);
 
-router.post("/:id/cancel", requireAuth, requireRole("admin"), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await provider.cancelCard(id);
+      return res.json({
+        success: true,
+        message: result.message,
+        cardId: id,
+      });
+    } catch (error) {
+      if (error.message.includes("no encontrada")) {
+        return res.status(404).json({
+          success: false,
+          error: error.message,
+        });
+      }
 
-    return res.json({
-      success: true,
-      message: result.message,
-      cardId: id,
-    });
-  } catch (error) {
-    if (error.message.includes("no encontrada")) {
-      return res.status(404).json({
+      return res.status(500).json({
         success: false,
         error: error.message,
       });
     }
+  },
+);
 
-    return res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+router.post(
+  "/:id/cancel",
+  requireAuth,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await provider.cancelCard(id);
+
+      return res.json({
+        success: true,
+        message: result.message,
+        cardId: id,
+      });
+    } catch (error) {
+      if (error.message.includes("no encontrada")) {
+        return res.status(404).json({
+          success: false,
+          error: error.message,
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  },
+);
 
 module.exports = router;
