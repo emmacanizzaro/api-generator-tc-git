@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Generador de Tarjetas Virtuales</title>
+    <title>CardForge — Virtual Card Generator</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="container">
       <!-- HEADER -->
       <header class="header">
-        <h1>💳 Generador de Tarjetas Virtuales</h1>
+        <h1>🏦 CardForge</h1>
         <p class="subtitle">Emisión de tarjetas en modo Sandbox</p>
       </header>
 
@@ -184,16 +184,28 @@
         <h2>Detalles de Tarjeta</h2>
         <div id="modalBody"></div>
         <div class="modal-actions">
-          <button id="revealSensitiveBtn" class="btn btn-primary" onclick="revealSensitiveCardData()">
+          <button
+            id="revealSensitiveBtn"
+            class="btn btn-primary"
+            onclick="revealSensitiveCardData()"
+          >
             👁️ Ver número y CVC
           </button>
           <button class="btn btn-secondary" onclick="copyStripeIdFromModal()">
             📋 Copiar ID Stripe
           </button>
-          <button id="freezeBtn" class="btn btn-warning" onclick="freezeCardFromModal()">
+          <button
+            id="freezeBtn"
+            class="btn btn-warning"
+            onclick="freezeCardFromModal()"
+          >
             ❄️ Congelar
           </button>
-          <button id="cancelBtn" class="btn btn-danger" onclick="cancelCardFromModal()">
+          <button
+            id="cancelBtn"
+            class="btn btn-danger"
+            onclick="cancelCardFromModal()"
+          >
             🗑️ Cancelar
           </button>
           <button class="btn btn-secondary" onclick="closeCardModal()">

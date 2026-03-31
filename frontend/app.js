@@ -1,5 +1,5 @@
 /**
- * LÓGICA FRONTEND - Generador de Tarjetas Virtuales
+ * LÓGICA FRONTEND - CardForge
  *
  * Responsabilidades:
  * - Comunicación con API REST (/api/cards)
@@ -529,10 +529,7 @@ async function saveApiCredentials() {
     const data = await response.json();
 
     if (!response.ok || !data.success) {
-      addLog(
-        `❌ Login fallido: ${data.error || "Error desconocido"}`,
-        "error",
-      );
+      addLog(`❌ Login fallido: ${data.error || "Error desconocido"}`, "error");
       return;
     }
 

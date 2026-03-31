@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ========================================
-# Script de Inicio - API Generador de TC
+# Script de Inicio - CardForge
 # ========================================
 # USO: ./start.sh
 # DESCRIPCIÓN: Inicia automáticamente el servidor en puerto 3000
 
-echo "🚀 Iniciando API Generador de Tarjetas Virtuales..."
+echo "🚀 Iniciando CardForge API..."
 echo ""
 
 # Verificar si estamos en la carpeta correct

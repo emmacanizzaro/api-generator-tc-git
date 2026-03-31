@@ -1,7 +1,7 @@
 {
-  "name": "virtual-card-generator",
+  "name": "cardforge",
   "version": "1.0.0",
-  "description": "Aplicación para generar y gestionar tarjetas virtuales usando APIs de proveedores financieros en sandbox",
+  "description": "CardForge — Virtual Card Generator API. Emite y gestiona tarjetas virtuales Stripe con panel de control propio.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
