@@ -14,6 +14,7 @@ const path = require('path');
 
 // Importar rutas
 const cardsRouter = require('./routes/cards');
+const authRouter = require('./routes/auth');
 
 // Inicializar app
 const app = express();
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 });
 
 // ============ RUTAS ============
+app.use('/api/auth', authRouter);
 app.use('/api/cards', cardsRouter);
 
 // Ruta de salud

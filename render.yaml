@@ -20,7 +20,13 @@ services:
         sync: false
       - key: STRIPE_PUBLIC_KEY
         sync: false
-      - key: BASIC_AUTH_USER
+      - key: AUTH_ADMIN_USER
         sync: false
-      - key: BASIC_AUTH_PASS
+      - key: AUTH_ADMIN_PASS
+        sync: false
+      - key: AUTH_VIEWER_USER
+        sync: false
+      - key: AUTH_VIEWER_PASS
+        sync: false
+      - key: JWT_SECRET
         sync: false

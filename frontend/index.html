@@ -32,7 +32,7 @@
       </section>
 
       <section class="auth-section">
-        <h2>Acceso API (Basic Auth)</h2>
+        <h2>Acceso API (Login + Roles)</h2>
         <div class="auth-grid">
           <div class="input-wrapper">
             <label for="apiUser">Usuario API:</label>
@@ -58,7 +58,7 @@
               class="btn btn-primary"
               onclick="saveApiCredentials()"
             >
-              Guardar sesión
+              Iniciar sesión
             </button>
             <button
               type="button"
@@ -69,7 +69,7 @@
             </button>
           </div>
         </div>
-        <p id="authStatus" class="auth-status">Sin credenciales cargadas.</p>
+        <p id="authStatus" class="auth-status">Sin sesión iniciada.</p>
       </section>
 
       <section class="metrics-section">
@@ -184,16 +184,16 @@
         <h2>Detalles de Tarjeta</h2>
         <div id="modalBody"></div>
         <div class="modal-actions">
-          <button class="btn btn-primary" onclick="revealSensitiveCardData()">
+          <button id="revealSensitiveBtn" class="btn btn-primary" onclick="revealSensitiveCardData()">
             👁️ Ver número y CVC
           </button>
           <button class="btn btn-secondary" onclick="copyStripeIdFromModal()">
             📋 Copiar ID Stripe
           </button>
-          <button class="btn btn-warning" onclick="freezeCardFromModal()">
+          <button id="freezeBtn" class="btn btn-warning" onclick="freezeCardFromModal()">
             ❄️ Congelar
           </button>
-          <button class="btn btn-danger" onclick="cancelCardFromModal()">
+          <button id="cancelBtn" class="btn btn-danger" onclick="cancelCardFromModal()">
             🗑️ Cancelar
           </button>
           <button class="btn btn-secondary" onclick="closeCardModal()">

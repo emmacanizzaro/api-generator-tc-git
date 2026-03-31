@@ -10,13 +10,15 @@
  */
 
 const API_BASE = "/api";
-const AUTH_STORAGE_KEY = "tc_api_basic_auth";
+const TOKEN_STORAGE_KEY = "tc_api_token";
+const USER_STORAGE_KEY = "tc_api_user";
 let currentCardId = null; // Para acciones en modal
 let currentCardStripeId = null;
 let allCards = [];
 let activeFilter = "all";
 let sensitiveDataTimeout = null;
-let apiAuthHeader = "";
+let apiToken = "";
+let currentUser = null;
 
 // ============ INICIALIZACIÓN ============
 
@@ -89,13 +91,15 @@ async function handleCreateCard(event) {
   addLog(`📝 Solicitando tarjeta para: ${holderName}`, "info");
 
   try {
-    if (!apiAuthHeader) {
-      showMessage(
-        messageDiv,
-        "⚠️ Cargá usuario y contraseña API primero",
-        "error",
-      );
-      addLog("⚠️ Faltan credenciales API para crear tarjeta", "warning");
+    if (!apiToken) {
+      showMessage(messageDiv, "⚠️ Iniciá sesión primero", "error");
+      addLog("⚠️ Falta sesión para crear tarjeta", "warning");
+      return;
+    }
+
+    if (!isAdmin()) {
+      showMessage(messageDiv, "❌ Tu rol no permite crear tarjetas", "error");
+      addLog("❌ Operación denegada por rol", "error");
       return;
     }
 
@@ -163,6 +167,10 @@ function renderFilteredCards() {
       : allCards.filter((card) => card.status === activeFilter);
 
   renderCards(cards);
+}
+
+function isAdmin() {
+  return currentUser && currentUser.role === "admin";
 }
 
 async function refreshMetrics() {
@@ -317,6 +325,15 @@ function openCardModal(card) {
   `;
 
   modal.style.display = "block";
+
+  const revealBtn = document.getElementById("revealSensitiveBtn");
+  const freezeBtn = document.getElementById("freezeBtn");
+  const cancelBtn = document.getElementById("cancelBtn");
+  const admin = isAdmin();
+
+  if (revealBtn) revealBtn.disabled = !admin;
+  if (freezeBtn) freezeBtn.disabled = !admin;
+  if (cancelBtn) cancelBtn.disabled = !admin;
 }
 
 function closeCardModal() {
@@ -352,8 +369,13 @@ async function cancelCardFromModal() {
 
 async function performCardAction(cardId, action) {
   try {
-    if (!apiAuthHeader) {
-      addLog("⚠️ Cargá credenciales API para ejecutar acciones", "warning");
+    if (!apiToken) {
+      addLog("⚠️ Iniciá sesión para ejecutar acciones", "warning");
+      return;
+    }
+
+    if (!isAdmin()) {
+      addLog("❌ Tu rol no permite ejecutar esta acción", "error");
       return;
     }
 
@@ -426,8 +448,13 @@ async function revealSensitiveCardData() {
   }
 
   try {
-    if (!apiAuthHeader) {
-      addLog("⚠️ Cargá credenciales API para revelar datos", "warning");
+    if (!apiToken) {
+      addLog("⚠️ Iniciá sesión para revelar datos", "warning");
+      return;
+    }
+
+    if (!isAdmin()) {
+      addLog("❌ Tu rol no permite revelar datos sensibles", "error");
       return;
     }
 
@@ -481,42 +508,82 @@ async function revealSensitiveCardData() {
   }
 }
 
-function saveApiCredentials() {
+async function saveApiCredentials() {
   const user = document.getElementById("apiUser").value.trim();
   const pass = document.getElementById("apiPass").value;
 
   if (!user || !pass) {
-    addLog("⚠️ Completá usuario y contraseña API", "warning");
+    addLog("⚠️ Completá usuario y contraseña", "warning");
     return;
   }
 
-  apiAuthHeader = `Basic ${btoa(`${user}:${pass}`)}`;
-  sessionStorage.setItem(AUTH_STORAGE_KEY, apiAuthHeader);
-  updateAuthStatus();
-  addLog("✅ Credenciales API guardadas en sesión", "success");
+  try {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username: user, password: pass }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      addLog(
+        `❌ Login fallido: ${data.error || "Error desconocido"}`,
+        "error",
+      );
+      return;
+    }
+
+    apiToken = data.data.token;
+    currentUser = data.data.user;
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, apiToken);
+    sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUser));
+    updateAuthStatus();
+    addLog(
+      `✅ Sesión iniciada como ${currentUser.username} (${currentUser.role})`,
+      "success",
+    );
+  } catch (error) {
+    addLog(`❌ Error de login: ${error.message}`, "error");
+  }
 }
 
 function clearApiCredentials() {
-  apiAuthHeader = "";
-  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  apiToken = "";
+  currentUser = null;
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(USER_STORAGE_KEY);
+  document.getElementById("apiUser").value = "";
   document.getElementById("apiPass").value = "";
   updateAuthStatus();
-  addLog("🧹 Credenciales API eliminadas de sesión", "info");
+  addLog("🧹 Sesión cerrada", "info");
 }
 
 function restoreApiCredentials() {
-  const saved = sessionStorage.getItem(AUTH_STORAGE_KEY);
-  if (saved && saved.startsWith("Basic ")) {
-    apiAuthHeader = saved;
+  const savedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const savedUser = sessionStorage.getItem(USER_STORAGE_KEY);
+
+  if (savedToken) {
+    apiToken = savedToken;
+  }
+
+  if (savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+    } catch (error) {
+      currentUser = null;
+    }
   }
 }
 
 function getAuthHeaders() {
-  if (!apiAuthHeader) {
+  if (!apiToken) {
     return {};
   }
 
-  return { Authorization: apiAuthHeader };
+  return { Authorization: `Bearer ${apiToken}` };
 }
 
 function updateAuthStatus() {
@@ -525,10 +592,10 @@ function updateAuthStatus() {
     return;
   }
 
-  authStatus.textContent = apiAuthHeader
-    ? "Sesión API activa"
-    : "Sin credenciales cargadas.";
-  authStatus.className = apiAuthHeader
+  authStatus.textContent = apiToken
+    ? `Sesión activa: ${currentUser?.username || "usuario"} (${currentUser?.role || "sin rol"})`
+    : "Sin sesión iniciada.";
+  authStatus.className = apiToken
     ? "auth-status auth-ok"
     : "auth-status auth-empty";
 }
