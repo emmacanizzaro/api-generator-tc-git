@@ -1,23 +1,24 @@
-# 💳 Generador de Tarjetas Virtuales
+# 🏦 CardForge — Virtual Card Generator API
 
-Aplicación web para generar y gestionar tarjetas virtuales usando APIs oficiales de emisión de tarjetas de proveedores financieros en modo **Sandbox**.
+**Proyecto personal fullstack** que permite emitir y gestionar tarjetas virtuales Stripe en tiempo real, con panel de control propio.
 
-## 📋 Características
+## ¿Qué hace?
 
-- ✅ **Interfaz moderna y responsiva** - HTML5, CSS3, JavaScript vanilla
-- ✅ **Backend REST API** - Node.js + Express
-- ✅ **Integración oficial** - Stripe Issuing (sandbox)
-- ✅ **Persistencia local** - SQLite
-- ✅ **PCI DSS Compliance** - Datos sensibles enmascarados
-- ✅ **KYC/AML Aware** - Requiere verificación previa
-- ✅ **Operaciones básicas**:
-  - Crear tarjetas virtuales
-  - Listar tarjetas
-  - Congelar tarjetas
-  - Cancelar tarjetas
-  - Auto-cancelación a los 10 minutos
-- ✅ **Logs en tiempo real** - Consola visual integrada
-- ✅ **Manejo de errores** - Validación y feedback claro
+- 🪪 **Emite tarjetas virtuales** con un click usando Stripe Issuing (sandbox/producción)
+- 🔒 **Revela número y CVC** de forma segura bajo demanda (sin persistir datos sensibles)
+- ❄️ **Congela / cancela** tarjetas al instante
+- 📊 **Dashboard de métricas** en tiempo real (activas, congeladas, por expirar)
+- 📤 **Exporta a CSV** con filtros por estado
+- 👥 **Roles admin / viewer** con autenticación JWT
+
+## Highlights técnicos
+
+- API REST protegida con JWT y control de roles por endpoint
+- Reveal de PAN/CVC efímero: se consulta a Stripe en tiempo real, nunca se almacena
+- Deploy-ready en Render.com (`render.yaml` incluido)
+- Versionado semántico: `v1.0.0` → `v1.1.0` → `v1.2.0`
+
+---
 
 ## 🛠️ Stack Tecnológico
 
@@ -26,6 +27,8 @@ Frontend:  HTML5, CSS3, JavaScript (Vanilla)
 Backend:   Node.js v18+, Express.js
 Database:  SQLite (better-sqlite3)
 API:       Stripe Issuing (Sandbox)
+Auth:      JWT (jsonwebtoken), roles: admin / viewer
+Deploy:    Render.com (render.yaml incluido)
 Config:    dotenv
 ```
 
