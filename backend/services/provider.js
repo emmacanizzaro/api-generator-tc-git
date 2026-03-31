@@ -23,6 +23,15 @@ const fs = require("fs");
 
 let stripe = null;
 
+/**
+ * Detecta si se debe usar modo mock (sin Stripe real)
+ * Se activa cuando no hay clave configurada o es el placeholder
+ */
+function isMockMode() {
+  const key = process.env.STRIPE_API_KEY || "";
+  return !key || key === "sk_test_YOUR_SECRET_KEY_HERE";
+}
+
 function getStripeClient() {
   if (stripe) {
     return stripe;
@@ -34,10 +43,75 @@ function getStripeClient() {
 
   stripe = new Stripe(process.env.STRIPE_API_KEY, {
     apiVersion: "2023-10-16",
-    httpClient: Stripe.createNodeHttpClient({ timeout: 30000 }),
+    timeout: 30000,
   });
 
   return stripe;
+}
+
+// ============ MOCK MODE ============
+
+const MOCK_BRANDS = ["Visa", "Mastercard"];
+
+function generateMockLastFour() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function generateMockCardNumber() {
+  // Genera número de 16 dígitos solo para display en mock (no se almacena)
+  return Array.from({ length: 4 }, () =>
+    String(Math.floor(1000 + Math.random() * 9000)),
+  ).join(" ");
+}
+
+function createMockCardData(holderName) {
+  const brand = MOCK_BRANDS[Math.floor(Math.random() * MOCK_BRANDS.length)];
+  const lastFour = generateMockLastFour();
+  const cardId = generateCardId();
+  const mockStripeId = "mock_card_" + Date.now();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const expMonth = Math.floor(Math.random() * 12) + 1;
+  const expYear = new Date().getFullYear() + 3;
+
+  const stmt = db.prepare(`
+    INSERT INTO virtual_cards
+    (id, stripe_card_id, holder_name, last_four, brand, status, expires_at, exp_month, exp_year, action_history)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const history = JSON.stringify([
+    { action: "created", timestamp: new Date().toISOString(), mode: "mock" },
+  ]);
+
+  stmt.run(
+    cardId,
+    mockStripeId,
+    holderName,
+    lastFour,
+    brand,
+    "active",
+    expiresAt.toISOString(),
+    expMonth,
+    expYear,
+    history,
+  );
+
+  console.log(`[PROVIDER MOCK] ✅ Tarjeta simulada creada: ${cardId}`);
+
+  return {
+    id: cardId,
+    stripeId: mockStripeId,
+    holderName,
+    lastFour,
+    brand,
+    status: "active",
+    expMonth,
+    expYear,
+    createdAt: new Date().toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    mock: true,
+    message: `Tarjeta virtual simulada (modo demo). Expirará en 10 minutos.`,
+  };
 }
 
 // Base de datos SQLite local
@@ -58,10 +132,16 @@ db.exec(`
     status TEXT DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME,
+    exp_month INTEGER,
+    exp_year INTEGER,
     auto_cancel BOOLEAN DEFAULT 0,
     action_history TEXT
   )
 `);
+
+// Asegura compatibilidad con bases previas a la incorporación de estos campos
+ensureColumn("exp_month", "INTEGER");
+ensureColumn("exp_year", "INTEGER");
 
 // ============ FUNCIONES PRINCIPALES ============
 
@@ -75,6 +155,12 @@ db.exec(`
 async function createVirtualCard(holderName, currency = "usd") {
   try {
     console.log(`[PROVIDER] Creando tarjeta virtual para: ${holderName}`);
+
+    if (isMockMode()) {
+      console.log("[PROVIDER MOCK] Modo demo activo (sin Stripe)");
+      return createMockCardData(holderName);
+    }
+
     const stripeClient = getStripeClient();
 
     // 1. Verificar que hay un cardholder en Stripe
@@ -123,6 +209,8 @@ async function createVirtualCard(holderName, currency = "usd") {
     }
 
     const brand = cardDetails.brand || card.brand || "Visa"; // Stripe usa Visa por defecto en sandbox
+    const expMonth = cardDetails.exp_month || card.exp_month || null;
+    const expYear = cardDetails.exp_year || card.exp_year || null;
 
     // 5. Guardar en BD local (SIN el número completo)
     const cardId = generateCardId();
@@ -130,8 +218,8 @@ async function createVirtualCard(holderName, currency = "usd") {
 
     const stmt = db.prepare(`
       INSERT INTO virtual_cards
-      (id, stripe_card_id, holder_name, last_four, brand, status, expires_at, action_history)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (id, stripe_card_id, holder_name, last_four, brand, status, expires_at, exp_month, exp_year, action_history)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const history = JSON.stringify([
@@ -146,6 +234,8 @@ async function createVirtualCard(holderName, currency = "usd") {
       brand,
       "active",
       expiresAt.toISOString(),
+      expMonth,
+      expYear,
       history,
     );
 
@@ -158,6 +248,8 @@ async function createVirtualCard(holderName, currency = "usd") {
       lastFour: lastFour,
       brand: brand,
       status: "active",
+      expMonth,
+      expYear,
       createdAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString(),
       message: `Tarjeta virtual emitida. Expirará en 10 minutos (modo sandbox).`,
@@ -176,8 +268,9 @@ async function createVirtualCard(holderName, currency = "usd") {
 function getAllCards() {
   try {
     const stmt = db.prepare(`
-      SELECT id, holder_name as holderName, last_four as lastFour,
-             brand, status, created_at as createdAt, expires_at as expiresAt
+          SELECT id, holder_name as holderName, last_four as lastFour,
+            brand, status, created_at as createdAt, expires_at as expiresAt,
+            exp_month as expMonth, exp_year as expYear
       FROM virtual_cards
       ORDER BY created_at DESC
     `);
@@ -214,9 +307,56 @@ function getCard(cardId) {
       lastFour: card.last_four,
       brand: card.brand,
       status: card.status,
+      expMonth: card.exp_month,
+      expYear: card.exp_year,
       createdAt: card.created_at,
       expiresAt: card.expires_at,
       actionHistory: JSON.parse(card.action_history || "[]"),
+    };
+  } catch (error) {
+    console.error("[PROVIDER ERROR]", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Revelar datos sensibles de tarjeta (solo lectura puntual, no persistente)
+ *
+ * @param {string} cardId - ID local de la tarjeta
+ * @returns {Promise<Object>} Número y CVC de Stripe
+ */
+async function revealCardSensitiveData(cardId) {
+  try {
+    const card = getCard(cardId);
+    const isMockCard = card.stripeId.startsWith("mock_card_");
+
+    if (isMockMode() || isMockCard) {
+      throw new Error(
+        "Datos sensibles no disponibles en modo mock. Cree una tarjeta real de Stripe.",
+      );
+    }
+
+    const stripeClient = getStripeClient();
+    const stripeCard = await stripeClient.issuing.cards.retrieve(
+      card.stripeId,
+      {
+        expand: ["number", "cvc"],
+      },
+    );
+
+    if (!stripeCard.number || !stripeCard.cvc) {
+      throw new Error(
+        "Stripe no devolvió número/CVC. Verifique permisos de Issuing para la API key.",
+      );
+    }
+
+    return {
+      number: stripeCard.number,
+      cvc: stripeCard.cvc,
+      expMonth: stripeCard.exp_month,
+      expYear: stripeCard.exp_year,
+      brand: stripeCard.brand,
+      revealedAt: new Date().toISOString(),
     };
   } catch (error) {
     console.error("[PROVIDER ERROR]", error.message);
@@ -232,19 +372,22 @@ function getCard(cardId) {
  */
 async function freezeCard(cardId) {
   try {
-    const stripeClient = getStripeClient();
     const card = getCard(cardId);
+    const isMockCard = card.stripeId.startsWith("mock_card_");
 
     if (card.status === "frozen") {
       return { message: "Tarjeta ya está congelada" };
     }
 
-    // Llamar API de Stripe para congelar
-    await stripeClient.issuing.cards.update(card.stripeId, {
-      status: "inactive",
-    });
+    if (!isMockMode() && !isMockCard) {
+      const stripeClient = getStripeClient();
+      await stripeClient.issuing.cards.update(card.stripeId, {
+        status: "inactive",
+      });
+    } else {
+      console.log(`[PROVIDER MOCK] Congelando tarjeta localmente: ${cardId}`);
+    }
 
-    // Actualizar en BD local
     updateCardStatus(cardId, "frozen");
     addToHistory(cardId, "frozen");
 
@@ -265,19 +408,22 @@ async function freezeCard(cardId) {
  */
 async function cancelCard(cardId) {
   try {
-    const stripeClient = getStripeClient();
     const card = getCard(cardId);
+    const isMockCard = card.stripeId.startsWith("mock_card_");
 
     if (card.status === "cancelled") {
       return { message: "Tarjeta ya está cancelada" };
     }
 
-    // Llamar API de Stripe para cancelar
-    await stripeClient.issuing.cards.update(card.stripeId, {
-      status: "canceled",
-    });
+    if (!isMockMode() && !isMockCard) {
+      const stripeClient = getStripeClient();
+      await stripeClient.issuing.cards.update(card.stripeId, {
+        status: "canceled",
+      });
+    } else {
+      console.log(`[PROVIDER MOCK] Cancelando tarjeta localmente: ${cardId}`);
+    }
 
-    // Actualizar en BD local
     updateCardStatus(cardId, "cancelled");
     addToHistory(cardId, "cancelled");
 
@@ -328,6 +474,15 @@ function generateCardId() {
   );
 }
 
+function ensureColumn(columnName, columnType) {
+  const columns = db.prepare("PRAGMA table_info(virtual_cards)").all();
+  const hasColumn = columns.some((c) => c.name === columnName);
+
+  if (!hasColumn) {
+    db.exec(`ALTER TABLE virtual_cards ADD COLUMN ${columnName} ${columnType}`);
+  }
+}
+
 function updateCardStatus(cardId, status) {
   const stmt = db.prepare("UPDATE virtual_cards SET status = ? WHERE id = ?");
   stmt.run(status, cardId);
@@ -359,6 +514,7 @@ module.exports = {
   createVirtualCard,
   getAllCards,
   getCard,
+  revealCardSensitiveData,
   freezeCard,
   cancelCard,
   autoCancelExpiredCards,

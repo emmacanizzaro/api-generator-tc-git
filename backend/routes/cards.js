@@ -4,6 +4,7 @@
  * POST   /api/cards              - Crear tarjeta virtual
  * GET    /api/cards              - Listar todas las tarjetas
  * GET    /api/cards/:id          - Obtener detalles de una tarjeta
+ * POST   /api/cards/:id/reveal    - Revelar PAN/CVC (solo desarrollo)
  * POST   /api/cards/:id/freeze   - Congelar tarjeta
  * POST   /api/cards/:id/cancel   - Cancelar tarjeta
  */
@@ -117,6 +118,49 @@ router.get("/:id", (req, res) => {
     res.json({
       success: true,
       data: card,
+    });
+  } catch (error) {
+    console.error("[ROUTE ERROR]", error.message);
+
+    if (error.message.includes("no encontrada")) {
+      return res.status(404).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/cards/:id/reveal
+ * Revelar número completo y CVC de una tarjeta virtual (uso puntual)
+ */
+router.post("/:id/reveal", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (process.env.NODE_ENV === "production") {
+      return res.status(403).json({
+        success: false,
+        error: "Revelado de datos sensibles deshabilitado en producción",
+      });
+    }
+
+    console.log(
+      `\n👁️  [POST /api/cards/:id/reveal] Revelando datos para: ${id}`,
+    );
+
+    const sensitiveData = await provider.revealCardSensitiveData(id);
+
+    res.json({
+      success: true,
+      data: sensitiveData,
+      warning: "Datos sensibles: no almacenar ni compartir.",
     });
   } catch (error) {
     console.error("[ROUTE ERROR]", error.message);

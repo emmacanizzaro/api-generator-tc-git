@@ -27,7 +27,7 @@ html {
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: var(--dark);
   line-height: 1.6;
@@ -299,13 +299,17 @@ section h2 {
 }
 
 .card::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -50%;
   right: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.1) 1px,
+    transparent 1px
+  );
   background-size: 20px 20px;
 }
 
@@ -323,7 +327,7 @@ section h2 {
   font-size: 1.5rem;
   letter-spacing: 2px;
   margin: 20px 0;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
 }
 
 .card-holder {
@@ -398,6 +402,38 @@ section h2 {
   font-size: 1.1rem;
 }
 
+.cards-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.filter-group select {
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  font-size: 0.95rem;
+}
+
+.filter-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
 /* ========================================
    MODAL
    ======================================== */
@@ -459,6 +495,12 @@ section h2 {
   color: var(--primary);
 }
 
+.modal-detail span {
+  max-width: 65%;
+  text-align: right;
+  word-break: break-word;
+}
+
 .modal-actions {
   display: flex;
   gap: 10px;
@@ -469,6 +511,34 @@ section h2 {
 .modal-actions .btn {
   flex: 1;
   min-width: 120px;
+}
+
+.sensitive-data {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.sensitive-header {
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 8px;
+}
+
+.sensitive-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: "Courier New", monospace;
+  margin-top: 4px;
+}
+
+.sensitive-row span {
+  word-break: break-all;
+  text-align: right;
 }
 
 /* ========================================
@@ -491,7 +561,7 @@ section h2 {
   padding: 15px;
   height: 300px;
   overflow-y: auto;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 0.9rem;
   line-height: 1.4;
 }
@@ -564,6 +634,15 @@ section h2 {
 
   .cards-grid {
     grid-template-columns: 1fr;
+  }
+
+  .cards-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-group {
+    justify-content: space-between;
   }
 
   .modal-actions {

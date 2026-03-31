@@ -11,6 +11,10 @@
 
 const API_BASE = "/api";
 let currentCardId = null; // Para acciones en modal
+let currentCardStripeId = null;
+let allCards = [];
+let activeFilter = "all";
+let sensitiveDataTimeout = null;
 
 // ============ INICIALIZACIÓN ============
 
@@ -26,6 +30,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("createCardForm")
     .addEventListener("submit", handleCreateCard);
+
+  document
+    .getElementById("statusFilter")
+    .addEventListener("change", (event) => {
+      activeFilter = event.target.value;
+      renderFilteredCards();
+    });
 });
 
 // ============ VERIFICACIÓN DE SALUD ============
@@ -117,7 +128,8 @@ async function refreshCards() {
     const data = await response.json();
 
     if (response.ok && data.success) {
-      renderCards(data.data);
+      allCards = data.data;
+      renderFilteredCards();
       addLog(`✅ ${data.count} tarjeta(s) cargada(s)`, "success");
     } else {
       addLog("❌ Error al cargar tarjetas", "error");
@@ -125,6 +137,15 @@ async function refreshCards() {
   } catch (error) {
     addLog(`❌ Error: ${error.message}`, "error");
   }
+}
+
+function renderFilteredCards() {
+  const cards =
+    activeFilter === "all"
+      ? allCards
+      : allCards.filter((card) => card.status === activeFilter);
+
+  renderCards(cards);
 }
 
 function renderCards(cards) {
@@ -147,7 +168,7 @@ function renderCards(cards) {
   cards.forEach((card) => {
     const cardEl = document.querySelector(`[data-card-id="${card.id}"]`);
     if (cardEl) {
-      cardEl.addEventListener("click", () => openCardModal(card));
+      cardEl.addEventListener("click", () => openCardModalById(card.id));
     }
   });
 }
@@ -166,7 +187,7 @@ function createCardElement(card) {
         <span>${formatDate(card.createdAt)}</span>
       </div>
       <div class="card-actions">
-        <button class="card-action-btn" onclick="event.stopPropagation(); openCardModal(${JSON.stringify(card).replace(/"/g, "&quot;")})">
+        <button class="card-action-btn" onclick="event.stopPropagation(); openCardModalById('${card.id}')">
           Ver Detalles
         </button>
       </div>
@@ -176,8 +197,30 @@ function createCardElement(card) {
 
 // ============ MODAL DE TARJETA ============
 
+async function openCardModalById(cardId) {
+  try {
+    addLog(`🔍 Cargando detalles de tarjeta ${cardId}...`, "info");
+
+    const response = await fetch(`${API_BASE}/cards/${cardId}`);
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      openCardModal(data.data);
+      return;
+    }
+
+    addLog(
+      `❌ No se pudo cargar detalle: ${data.error || "Error desconocido"}`,
+      "error",
+    );
+  } catch (error) {
+    addLog(`❌ Error cargando detalle: ${error.message}`, "error");
+  }
+}
+
 function openCardModal(card) {
   currentCardId = card.id;
+  currentCardStripeId = card.stripeId || null;
   const modal = document.getElementById("cardModal");
   const modalBody = document.getElementById("modalBody");
 
@@ -195,6 +238,12 @@ function openCardModal(card) {
       <strong>Tarjeta:</strong> <span>${card.brand} •••• ${card.lastFour}</span>
     </div>
     <div class="modal-detail">
+      <strong>Vencimiento tarjeta:</strong> <span>${formatCardExpiry(card.expMonth, card.expYear)}</span>
+    </div>
+    <div class="modal-detail">
+      <strong>ID Stripe:</strong> <span>${card.stripeId || "N/D"}</span>
+    </div>
+    <div class="modal-detail">
       <strong>Estado:</strong> <span>${translateStatus(card.status)}</span>
     </div>
     <div class="modal-detail">
@@ -203,6 +252,7 @@ function openCardModal(card) {
     <div class="modal-detail">
       <strong>Expira:</strong> <span>${formatDate(card.expiresAt)} ${isExpired ? "(⏰ Vencida)" : ""}</span>
     </div>
+    <div id="sensitiveDataContainer" class="sensitive-data" style="display:none;"></div>
     ${
       card.actionHistory && card.actionHistory.length > 0
         ? `
@@ -229,6 +279,12 @@ function openCardModal(card) {
 function closeCardModal() {
   document.getElementById("cardModal").style.display = "none";
   currentCardId = null;
+  currentCardStripeId = null;
+
+  if (sensitiveDataTimeout) {
+    clearTimeout(sensitiveDataTimeout);
+    sensitiveDataTimeout = null;
+  }
 }
 
 // ============ ACCIONES EN MODAL ============
@@ -273,6 +329,150 @@ async function performCardAction(cardId, action) {
   } catch (error) {
     addLog(`❌ Error: ${error.message}`, "error");
   }
+}
+
+async function copyStripeIdFromModal() {
+  if (!currentCardStripeId) {
+    addLog("⚠️ Esta tarjeta no tiene ID Stripe disponible", "warning");
+    return;
+  }
+
+  try {
+    if (!navigator.clipboard || !window.isSecureContext) {
+      const tempInput = document.createElement("textarea");
+      tempInput.value = currentCardStripeId;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand("copy");
+      document.body.removeChild(tempInput);
+    } else {
+      await navigator.clipboard.writeText(currentCardStripeId);
+    }
+
+    addLog("✅ ID Stripe copiado al portapapeles", "success");
+  } catch (error) {
+    addLog(`❌ No se pudo copiar el ID Stripe: ${error.message}`, "error");
+  }
+}
+
+async function revealSensitiveCardData() {
+  if (!currentCardId) {
+    addLog("⚠️ No hay tarjeta seleccionada", "warning");
+    return;
+  }
+
+  const accepted = confirm(
+    "Se mostrará número y CVC por 30 segundos. No compartas estos datos.",
+  );
+
+  if (!accepted) {
+    return;
+  }
+
+  try {
+    addLog("👁️ Solicitando número y CVC a Stripe...", "info");
+
+    const response = await fetch(`${API_BASE}/cards/${currentCardId}/reveal`, {
+      method: "POST",
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      addLog(
+        `❌ No se pudo revelar: ${data.error || "Error desconocido"}`,
+        "error",
+      );
+      return;
+    }
+
+    const container = document.getElementById("sensitiveDataContainer");
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="sensitive-header">⚠️ Datos sensibles (visible 30s)</div>
+      <div class="sensitive-row"><strong>Número:</strong> <span>${formatCardNumber(data.data.number)}</span></div>
+      <div class="sensitive-row"><strong>CVC:</strong> <span>${data.data.cvc}</span></div>
+      <div class="sensitive-row"><strong>Exp:</strong> <span>${formatCardExpiry(data.data.expMonth, data.data.expYear)}</span></div>
+    `;
+    container.style.display = "block";
+
+    if (sensitiveDataTimeout) {
+      clearTimeout(sensitiveDataTimeout);
+    }
+
+    sensitiveDataTimeout = setTimeout(() => {
+      const liveContainer = document.getElementById("sensitiveDataContainer");
+      if (liveContainer) {
+        liveContainer.style.display = "none";
+        liveContainer.innerHTML = "";
+      }
+      addLog("🔒 Datos sensibles ocultados automáticamente", "info");
+    }, 30000);
+
+    addLog("✅ Número y CVC visibles temporalmente", "success");
+  } catch (error) {
+    addLog(`❌ Error al revelar datos: ${error.message}`, "error");
+  }
+}
+
+function exportCardsCsv() {
+  const cardsToExport =
+    activeFilter === "all"
+      ? allCards
+      : allCards.filter((card) => card.status === activeFilter);
+
+  if (cardsToExport.length === 0) {
+    addLog("⚠️ No hay tarjetas para exportar con el filtro actual", "warning");
+    return;
+  }
+
+  const headers = [
+    "id",
+    "holderName",
+    "brand",
+    "lastFour",
+    "status",
+    "expMonth",
+    "expYear",
+    "createdAt",
+    "expiresAt",
+  ];
+
+  const escapeCsv = (value) => {
+    const text = value === undefined || value === null ? "" : String(value);
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+
+  const rows = cardsToExport.map((card) =>
+    [
+      card.id,
+      card.holderName,
+      card.brand,
+      card.lastFour,
+      card.status,
+      card.expMonth,
+      card.expYear,
+      card.createdAt,
+      card.expiresAt,
+    ]
+      .map(escapeCsv)
+      .join(","),
+  );
+
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  a.href = url;
+  a.download = `tarjetas-${activeFilter}-${timestamp}.csv`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+  addLog(`✅ CSV exportado (${cardsToExport.length} tarjeta(s))`, "success");
 }
 
 // ============ SISTEMA DE LOGS ============
@@ -339,6 +539,22 @@ function formatDate(dateString) {
   } catch (error) {
     return dateString;
   }
+}
+
+function formatCardExpiry(month, year) {
+  if (!month || !year) {
+    return "No disponible";
+  }
+
+  return `${String(month).padStart(2, "0")}/${year}`;
+}
+
+function formatCardNumber(number) {
+  if (!number) {
+    return "No disponible";
+  }
+
+  return number.replace(/(.{4})/g, "$1 ").trim();
 }
 
 function showMessage(element, message, type) {
