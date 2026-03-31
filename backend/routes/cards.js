@@ -10,8 +10,92 @@
  */
 
 const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 const provider = require("../services/provider");
+
+const basicAuthUser = process.env.BASIC_AUTH_USER || "";
+const basicAuthPass = process.env.BASIC_AUTH_PASS || "";
+let authWarningShown = false;
+
+function secureCompare(a, b) {
+  const bufferA = Buffer.from(a, "utf8");
+  const bufferB = Buffer.from(b, "utf8");
+
+  if (bufferA.length !== bufferB.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(bufferA, bufferB);
+}
+
+function requireBasicAuth(req, res, next) {
+  const missingCredentials = !basicAuthUser || !basicAuthPass;
+
+  if (missingCredentials) {
+    if (process.env.NODE_ENV === "production") {
+      return res.status(503).json({
+        success: false,
+        error:
+          "Autenticación básica no configurada. Defina BASIC_AUTH_USER y BASIC_AUTH_PASS.",
+      });
+    }
+
+    if (!authWarningShown) {
+      console.warn(
+        "[AUTH] BASIC_AUTH_USER/BASIC_AUTH_PASS no definidos. Acceso abierto en desarrollo.",
+      );
+      authWarningShown = true;
+    }
+
+    return next();
+  }
+
+  const authHeader = req.headers.authorization || "";
+
+  if (!authHeader.startsWith("Basic ")) {
+    res.set("WWW-Authenticate", 'Basic realm="Tarjetas API"');
+    return res.status(401).json({
+      success: false,
+      error: "Credenciales requeridas",
+    });
+  }
+
+  const token = authHeader.slice(6);
+  let decoded = "";
+
+  try {
+    decoded = Buffer.from(token, "base64").toString("utf8");
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      error: "Authorization inválido",
+    });
+  }
+
+  const separatorIndex = decoded.indexOf(":");
+  if (separatorIndex < 0) {
+    return res.status(401).json({
+      success: false,
+      error: "Formato de credenciales inválido",
+    });
+  }
+
+  const user = decoded.slice(0, separatorIndex);
+  const pass = decoded.slice(separatorIndex + 1);
+
+  if (
+    !secureCompare(user, basicAuthUser) ||
+    !secureCompare(pass, basicAuthPass)
+  ) {
+    return res.status(401).json({
+      success: false,
+      error: "Usuario o contraseña inválidos",
+    });
+  }
+
+  return next();
+}
 
 // ============ VALIDACIÓN DE INPUTS ============
 
@@ -52,7 +136,7 @@ const validateHolderName = (req, res, next) => {
  *   "currency": "usd"  (opcional)
  * }
  */
-router.post("/", validateHolderName, async (req, res) => {
+router.post("/", requireBasicAuth, validateHolderName, async (req, res) => {
   try {
     const { holderName, currency = "usd" } = req.body;
 
@@ -104,6 +188,27 @@ router.get("/", (req, res) => {
 });
 
 /**
+ * GET /api/cards/metrics
+ * Obtener métricas para dashboard
+ */
+router.get("/metrics", (req, res) => {
+  try {
+    const metrics = provider.getDashboardMetrics();
+
+    res.json({
+      success: true,
+      data: metrics,
+    });
+  } catch (error) {
+    console.error("[ROUTE ERROR]", error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/cards/:id
  * Obtener detalles de una tarjeta específica
  */
@@ -140,7 +245,7 @@ router.get("/:id", (req, res) => {
  * POST /api/cards/:id/reveal
  * Revelar número completo y CVC de una tarjeta virtual (uso puntual)
  */
-router.post("/:id/reveal", async (req, res) => {
+router.post("/:id/reveal", requireBasicAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -183,7 +288,7 @@ router.post("/:id/reveal", async (req, res) => {
  * POST /api/cards/:id/freeze
  * Congelar una tarjeta virtual
  */
-router.post("/:id/freeze", async (req, res) => {
+router.post("/:id/freeze", requireBasicAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -217,7 +322,7 @@ router.post("/:id/freeze", async (req, res) => {
  * POST /api/cards/:id/cancel
  * Cancelar una tarjeta virtual
  */
-router.post("/:id/cancel", async (req, res) => {
+router.post("/:id/cancel", requireBasicAuth, async (req, res) => {
   try {
     const { id } = req.params;
 

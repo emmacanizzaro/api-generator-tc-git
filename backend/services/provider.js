@@ -286,6 +286,63 @@ function getAllCards() {
 }
 
 /**
+ * Obtener métricas generales para dashboard
+ *
+ * @returns {Object} Resumen de métricas
+ */
+function getDashboardMetrics() {
+  try {
+    const totals = db
+      .prepare(
+        `
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+        SUM(CASE WHEN status = 'frozen' THEN 1 ELSE 0 END) as frozen,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
+      FROM virtual_cards
+    `,
+      )
+      .get();
+
+    const expiringSoon = db
+      .prepare(
+        `
+      SELECT COUNT(*) as count
+      FROM virtual_cards
+      WHERE status = 'active'
+        AND datetime(expires_at) BETWEEN datetime('now') AND datetime('now', '+10 minutes')
+    `,
+      )
+      .get();
+
+    const recent = db
+      .prepare(
+        `
+      SELECT holder_name as holderName, brand, last_four as lastFour, created_at as createdAt
+      FROM virtual_cards
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+      )
+      .get();
+
+    return {
+      total: totals.total || 0,
+      active: totals.active || 0,
+      frozen: totals.frozen || 0,
+      cancelled: totals.cancelled || 0,
+      expiringSoon: expiringSoon.count || 0,
+      lastIssuedCard: recent || null,
+      generatedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error("[PROVIDER ERROR]", error.message);
+    throw error;
+  }
+}
+
+/**
  * Obtener detalles de una tarjeta
  *
  * @param {string} cardId - ID local de la tarjeta
@@ -513,6 +570,7 @@ setInterval(autoCancelExpiredCards, 5 * 60 * 1000);
 module.exports = {
   createVirtualCard,
   getAllCards,
+  getDashboardMetrics,
   getCard,
   revealCardSensitiveData,
   freezeCard,

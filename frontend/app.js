@@ -10,15 +10,20 @@
  */
 
 const API_BASE = "/api";
+const AUTH_STORAGE_KEY = "tc_api_basic_auth";
 let currentCardId = null; // Para acciones en modal
 let currentCardStripeId = null;
 let allCards = [];
 let activeFilter = "all";
 let sensitiveDataTimeout = null;
+let apiAuthHeader = "";
 
 // ============ INICIALIZACIÓN ============
 
 document.addEventListener("DOMContentLoaded", () => {
+  restoreApiCredentials();
+  updateAuthStatus();
+
   addLog("Sistema iniciado. Conectando a servidor...", "info");
 
   // Cargar tarjetas al iniciar
@@ -48,6 +53,7 @@ async function checkHealthAndLoadCards() {
     if (response.ok) {
       addLog("✅ Conectado al servidor", "success");
       refreshCards();
+      refreshMetrics();
     }
   } catch (error) {
     addLog(
@@ -83,10 +89,21 @@ async function handleCreateCard(event) {
   addLog(`📝 Solicitando tarjeta para: ${holderName}`, "info");
 
   try {
+    if (!apiAuthHeader) {
+      showMessage(
+        messageDiv,
+        "⚠️ Cargá usuario y contraseña API primero",
+        "error",
+      );
+      addLog("⚠️ Faltan credenciales API para crear tarjeta", "warning");
+      return;
+    }
+
     const response = await fetch(`${API_BASE}/cards`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({ holderName }),
     });
@@ -146,6 +163,32 @@ function renderFilteredCards() {
       : allCards.filter((card) => card.status === activeFilter);
 
   renderCards(cards);
+}
+
+async function refreshMetrics() {
+  try {
+    const response = await fetch(`${API_BASE}/cards/metrics`);
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      addLog("❌ No se pudieron cargar métricas", "error");
+      return;
+    }
+
+    renderMetrics(data.data);
+  } catch (error) {
+    addLog(`❌ Error al cargar métricas: ${error.message}`, "error");
+  }
+}
+
+function renderMetrics(metrics) {
+  document.getElementById("metricTotal").textContent = metrics.total ?? 0;
+  document.getElementById("metricActive").textContent = metrics.active ?? 0;
+  document.getElementById("metricFrozen").textContent = metrics.frozen ?? 0;
+  document.getElementById("metricCancelled").textContent =
+    metrics.cancelled ?? 0;
+  document.getElementById("metricExpiringSoon").textContent =
+    metrics.expiringSoon ?? 0;
 }
 
 function renderCards(cards) {
@@ -309,6 +352,11 @@ async function cancelCardFromModal() {
 
 async function performCardAction(cardId, action) {
   try {
+    if (!apiAuthHeader) {
+      addLog("⚠️ Cargá credenciales API para ejecutar acciones", "warning");
+      return;
+    }
+
     const url =
       action === "freeze"
         ? `${API_BASE}/cards/${cardId}/freeze`
@@ -316,13 +364,21 @@ async function performCardAction(cardId, action) {
 
     addLog(`🔄 Ejecutando acción: ${action}...`, "info");
 
-    const response = await fetch(url, { method: "POST" });
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+      },
+    });
     const data = await response.json();
 
     if (response.ok && data.success) {
       addLog(`✅ Acción completada: ${data.message}`, "success");
       closeCardModal();
-      setTimeout(() => refreshCards(), 500);
+      setTimeout(() => {
+        refreshCards();
+        refreshMetrics();
+      }, 500);
     } else {
       addLog(`❌ Error: ${data.error}`, "error");
     }
@@ -370,10 +426,18 @@ async function revealSensitiveCardData() {
   }
 
   try {
+    if (!apiAuthHeader) {
+      addLog("⚠️ Cargá credenciales API para revelar datos", "warning");
+      return;
+    }
+
     addLog("👁️ Solicitando número y CVC a Stripe...", "info");
 
     const response = await fetch(`${API_BASE}/cards/${currentCardId}/reveal`, {
       method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+      },
     });
     const data = await response.json();
 
@@ -415,6 +479,58 @@ async function revealSensitiveCardData() {
   } catch (error) {
     addLog(`❌ Error al revelar datos: ${error.message}`, "error");
   }
+}
+
+function saveApiCredentials() {
+  const user = document.getElementById("apiUser").value.trim();
+  const pass = document.getElementById("apiPass").value;
+
+  if (!user || !pass) {
+    addLog("⚠️ Completá usuario y contraseña API", "warning");
+    return;
+  }
+
+  apiAuthHeader = `Basic ${btoa(`${user}:${pass}`)}`;
+  sessionStorage.setItem(AUTH_STORAGE_KEY, apiAuthHeader);
+  updateAuthStatus();
+  addLog("✅ Credenciales API guardadas en sesión", "success");
+}
+
+function clearApiCredentials() {
+  apiAuthHeader = "";
+  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  document.getElementById("apiPass").value = "";
+  updateAuthStatus();
+  addLog("🧹 Credenciales API eliminadas de sesión", "info");
+}
+
+function restoreApiCredentials() {
+  const saved = sessionStorage.getItem(AUTH_STORAGE_KEY);
+  if (saved && saved.startsWith("Basic ")) {
+    apiAuthHeader = saved;
+  }
+}
+
+function getAuthHeaders() {
+  if (!apiAuthHeader) {
+    return {};
+  }
+
+  return { Authorization: apiAuthHeader };
+}
+
+function updateAuthStatus() {
+  const authStatus = document.getElementById("authStatus");
+  if (!authStatus) {
+    return;
+  }
+
+  authStatus.textContent = apiAuthHeader
+    ? "Sesión API activa"
+    : "Sin credenciales cargadas.";
+  authStatus.className = apiAuthHeader
+    ? "auth-status auth-ok"
+    : "auth-status auth-empty";
 }
 
 function exportCardsCsv() {

@@ -31,6 +31,73 @@
         </p>
       </section>
 
+      <section class="auth-section">
+        <h2>Acceso API (Basic Auth)</h2>
+        <div class="auth-grid">
+          <div class="input-wrapper">
+            <label for="apiUser">Usuario API:</label>
+            <input
+              type="text"
+              id="apiUser"
+              placeholder="admin"
+              autocomplete="username"
+            />
+          </div>
+          <div class="input-wrapper">
+            <label for="apiPass">Contraseña API:</label>
+            <input
+              type="password"
+              id="apiPass"
+              placeholder="••••••••"
+              autocomplete="current-password"
+            />
+          </div>
+          <div class="button-group">
+            <button
+              type="button"
+              class="btn btn-primary"
+              onclick="saveApiCredentials()"
+            >
+              Guardar sesión
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              onclick="clearApiCredentials()"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+        <p id="authStatus" class="auth-status">Sin credenciales cargadas.</p>
+      </section>
+
+      <section class="metrics-section">
+        <h2>Dashboard de Métricas</h2>
+        <div class="metrics-grid">
+          <article class="metric-card">
+            <p>Total</p>
+            <h3 id="metricTotal">0</h3>
+          </article>
+          <article class="metric-card">
+            <p>Activas</p>
+            <h3 id="metricActive">0</h3>
+          </article>
+          <article class="metric-card">
+            <p>Congeladas</p>
+            <h3 id="metricFrozen">0</h3>
+          </article>
+          <article class="metric-card">
+            <p>Canceladas</p>
+            <h3 id="metricCancelled">0</h3>
+          </article>
+          <article class="metric-card">
+            <p>Por expirar (10m)</p>
+            <h3 id="metricExpiringSoon">0</h3>
+          </article>
+        </div>
+      </section>
+
       <!-- FORMULARIO CREAR TARJETA -->
       <section class="form-section">
         <h2>Crear Nueva Tarjeta Virtual</h2>
